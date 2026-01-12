@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { SimulationConfig } from '../types';
-import { SIM_LIMITS } from '../constants';
+import { CONSTRAINTS } from '../constants';
 import { Play, Pause } from 'lucide-react';
 
 interface ControlsProps {
@@ -8,6 +9,7 @@ interface ControlsProps {
   onChange: (key: keyof SimulationConfig, value: number) => void;
 }
 
+// Reusable slider row to reduce repetition
 const ControlRow: React.FC<{
   label: string;
   value: number;
@@ -18,7 +20,7 @@ const ControlRow: React.FC<{
   onChange: (val: number) => void;
 }> = ({ label, value, min, max, step = 1, unit = '', onChange }) => (
   <div className="flex items-center gap-3 h-8 select-none">
-    <label className="text-xs font-bold text-slate-700 w-24 shrink-0 truncate">{label}</label>
+    <label className="text-xs font-bold text-slate-700 w-24 shrink-0 truncate" title={label}>{label}</label>
     <input
       type="range"
       min={min}
@@ -35,79 +37,67 @@ const ControlRow: React.FC<{
 );
 
 export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
-  // Calculate visual slider value (0 = Open/Left, 100 = Closed/Right)
-  // config.actuatorExtension: 100 = Open, 0 = Closed.
-  // We want Slider Left (0) -> Open (100).
-  // We want Slider Right (100) -> Closed (0).
-  // So sliderValue = 100 - config.actuatorExtension.
-  const invertedSliderValue = 100 - config.actuatorExtension;
+  // Logic: 0% Extension = Closed = Slider Right
+  // 100% Extension = Open = Slider Left
+  // User wants a "Closed -> Open" slider visual, usually 0 -> 100.
+  // We map directly: 0% Ext (Closed) to 0 Slider.
+  const isPlaying = config.animationSpeed > 0;
 
   return (
     <div className="flex flex-col gap-1 w-full max-w-md mx-auto pt-2">
       
-      {/* Top Row: Speed and Open Position Combined */}
-      <div className="flex items-center gap-2 h-8 select-none">
+      {/* Top Section: Playback & Actuation */}
+      <div className="flex items-center gap-2 h-8 select-none mb-2 border-b border-slate-100 pb-2">
         
-        {/* Speed Control Section */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-           <button 
-              onClick={() => onChange('animationSpeed', config.animationSpeed > 0 ? 0 : 0.2)}
-              className="p-1 -ml-1 rounded hover:bg-slate-100 text-slate-600 transition-colors shrink-0 flex items-center justify-center"
-              title={config.animationSpeed > 0 ? "Pause" : "Play"}
-            >
-              {config.animationSpeed > 0 ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <label className="text-[10px] font-bold text-slate-700 shrink-0">Hz</label>
-            <input
-              type="range"
-              min={SIM_LIMITS.SPEED.MIN}
-              max={SIM_LIMITS.SPEED.MAX}
-              step={SIM_LIMITS.SPEED.STEP}
-              value={config.animationSpeed}
-              onChange={(e) => onChange('animationSpeed', parseFloat(e.target.value))}
-              className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 min-w-10"
-            />
-             <div className="text-[10px] font-mono text-slate-500 w-6 text-right shrink-0">
-              {config.animationSpeed.toFixed(1)}
-            </div>
+        {/* Play/Pause Button */}
+        <button 
+          onClick={() => onChange('animationSpeed', isPlaying ? 0 : 0.5)}
+          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${isPlaying ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-100 text-slate-600'}`}
+          title={isPlaying ? "Pause Animation" : "Play Animation"}
+        >
+          {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        </button>
+
+        {/* Speed Slider */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 border-r border-slate-200 pr-2 mr-2">
+          <label className="text-[10px] font-bold text-slate-500">SPEED</label>
+          <input
+            type="range"
+            min={CONSTRAINTS.SPEED.MIN}
+            max={CONSTRAINTS.SPEED.MAX}
+            step={CONSTRAINTS.SPEED.STEP}
+            value={config.animationSpeed}
+            onChange={(e) => onChange('animationSpeed', parseFloat(e.target.value))}
+            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-400"
+          />
         </div>
 
-        {/* Divider */}
-        <div className="w-px h-4 bg-slate-200 shrink-0" />
-
-        {/* Open Position Section */}
-        <div className="flex items-center gap-2 flex-[1.2] min-w-0">
-            <div className="text-[10px] font-mono text-slate-500 w-8 text-right shrink-0">
-              {Math.round(config.actuatorExtension)}%
-            </div>
-            
-            <label className="text-[10px] font-bold text-slate-700 shrink-0">OPEN</label>
-            
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={invertedSliderValue}
-              onChange={(e) => {
-                const sliderVal = parseFloat(e.target.value);
-                // Convert slider value (Left=0=Open, Right=100=Closed) back to extension (100=Open, 0=Closed)
-                const extension = 100 - sliderVal;
-                onChange('actuatorExtension', extension);
-                if (config.animationSpeed > 0) onChange('animationSpeed', 0);
-              }}
-              className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 min-w-10"
-            />
-            
-            <label className="text-[10px] font-bold text-slate-700 shrink-0">CLOSE</label>
+        {/* Position Slider */}
+        <div className="flex items-center gap-2 flex-[1.5] min-w-0">
+          <label className="text-[10px] font-bold text-slate-700">POS</label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={config.actuatorExtension}
+            onChange={(e) => {
+              onChange('actuatorExtension', parseFloat(e.target.value));
+              if (isPlaying) onChange('animationSpeed', 0); // Stop animation on manual drag
+            }}
+            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          />
+           <div className="text-[10px] font-mono text-slate-500 w-8 text-right shrink-0">
+            {Math.round(config.actuatorExtension)}%
+          </div>
         </div>
       </div>
 
-      {/* Configuration Rows */}
+      {/* Configuration Section */}
       <ControlRow
         label="Flap Length"
         value={config.flapHeight}
-        min={SIM_LIMITS.FLAP_HEIGHT.MIN}
-        max={SIM_LIMITS.FLAP_HEIGHT.MAX}
+        min={CONSTRAINTS.FLAP_HEIGHT.MIN}
+        max={CONSTRAINTS.FLAP_HEIGHT.MAX}
         unit="px"
         onChange={(v) => onChange('flapHeight', v)}
       />
@@ -115,8 +105,8 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
       <ControlRow
         label="Motor Spacing"
         value={config.motorSpacing}
-        min={SIM_LIMITS.MOTOR_SPACING.MIN}
-        max={SIM_LIMITS.MOTOR_SPACING.MAX}
+        min={CONSTRAINTS.MOTOR_SPACING.MIN}
+        max={CONSTRAINTS.MOTOR_SPACING.MAX}
         unit="px"
         onChange={(v) => onChange('motorSpacing', v)}
       />

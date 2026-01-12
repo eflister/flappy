@@ -1,87 +1,88 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Controls } from './components/Controls';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SimulationConfig } from './types';
-import { SIM_LIMITS } from './constants';
+import { CONSTRAINTS } from './constants';
 
+// Initial Application State
 const INITIAL_CONFIG: SimulationConfig = {
-  actuatorExtension: SIM_LIMITS.EXTENSION.DEFAULT,
-  flapHeight: SIM_LIMITS.FLAP_HEIGHT.DEFAULT,
-  motorSpacing: SIM_LIMITS.MOTOR_SPACING.DEFAULT,
-  animationSpeed: SIM_LIMITS.SPEED.DEFAULT,
+  actuatorExtension: CONSTRAINTS.EXTENSION.DEFAULT,
+  flapHeight:        CONSTRAINTS.FLAP_HEIGHT.DEFAULT,
+  motorSpacing:      CONSTRAINTS.MOTOR_SPACING.DEFAULT,
+  animationSpeed:    CONSTRAINTS.SPEED.DEFAULT,
 };
 
 export default function App() {
   const [config, setConfig] = useState<SimulationConfig>(INITIAL_CONFIG);
   
-  // Animation refs
+  // Animation State Refs (Mutable to avoid re-renders in loop)
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
-  const directionRef = useRef<1 | -1>(1);
-  const speedRef = useRef(config.animationSpeed);
-
-  // Sync ref with state for use inside animation loop
-  useEffect(() => {
-    speedRef.current = config.animationSpeed;
-  }, [config.animationSpeed]);
-
+  const directionRef = useRef<1 | -1>(1); // 1 = Opening, -1 = Closing
+  
+  // Update Config Helper
   const handleConfigChange = (key: keyof SimulationConfig, value: number) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
+  // Animation Loop
   useEffect(() => {
     const animate = (time: number) => {
-      if (lastTimeRef.current !== 0) {
+      if (lastTimeRef.current !== 0 && config.animationSpeed > 0) {
         const deltaTime = time - lastTimeRef.current;
-        const speed = speedRef.current; // Hz (Cycles per second)
         
-        if (speed > 0) {
-          // A cycle is defined as 0% -> 100% -> 0%
-          const range = SIM_LIMITS.EXTENSION.MAX - SIM_LIMITS.EXTENSION.MIN;
-          const totalDistancePerCycle = range * 2;
+        // Calculate step based on frequency (Hz)
+        // 1 Hz = Full Open (0->100) + Full Close (100->0) in 1 second? 
+        // Let's define speed as "Cycles per second". One cycle distance = 200 units (0->100->0).
+        const distancePerSec = 200 * config.animationSpeed; 
+        const moveStep = (distancePerSec * deltaTime) / 1000;
+        
+        setConfig(prev => {
+          let nextExt = prev.actuatorExtension + (moveStep * directionRef.current);
           
-          // Distance to move in this frame = (Total Distance/Cycle) * (Cycles/Sec) * (Sec/Frame)
-          const moveAmount = (totalDistancePerCycle * speed * deltaTime) / 1000;
+          // Bounce logic
+          if (nextExt >= CONSTRAINTS.EXTENSION.MAX) {
+            nextExt = CONSTRAINTS.EXTENSION.MAX;
+            directionRef.current = -1;
+          } else if (nextExt <= CONSTRAINTS.EXTENSION.MIN) {
+            nextExt = CONSTRAINTS.EXTENSION.MIN;
+            directionRef.current = 1;
+          }
           
-          setConfig(prev => {
-            let nextExt = prev.actuatorExtension + (moveAmount * directionRef.current);
-            
-            if (nextExt >= SIM_LIMITS.EXTENSION.MAX) {
-              nextExt = SIM_LIMITS.EXTENSION.MAX;
-              directionRef.current = -1;
-            } else if (nextExt <= SIM_LIMITS.EXTENSION.MIN) {
-              nextExt = SIM_LIMITS.EXTENSION.MIN;
-              directionRef.current = 1;
-            }
-            
-            return { ...prev, actuatorExtension: nextExt };
-          });
-        }
+          return { ...prev, actuatorExtension: nextExt };
+        });
       }
+      
       lastTimeRef.current = time;
       requestRef.current = requestAnimationFrame(animate);
     };
 
     requestRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, []);
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [config.animationSpeed]); // Re-bind if speed toggle changes to avoid stale state logic
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 overflow-hidden">
       <main className="flex-1 flex flex-col lg:flex-row min-h-screen">
-        {/* Visualization Area */}
+        
+        {/* Left: Visualization (Flexible growth) */}
         <section className="relative bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-200 lg:flex-1 flex justify-center items-center">
            <SimulationCanvas config={config} />
         </section>
 
-        {/* Sidebar Controls */}
-        <aside className="w-full lg:w-96 flex-shrink-0 bg-white p-4 overflow-y-auto">
+        {/* Right: Controls (Fixed Width) */}
+        <aside className="w-full lg:w-96 flex-shrink-0 bg-white p-4 overflow-y-auto shadow-xl z-20">
           <Controls 
             config={config} 
             onChange={handleConfigChange}
           />
+          <div className="mt-8 p-4 bg-slate-50 rounded text-[10px] text-slate-400 font-mono leading-relaxed">
+            <p><strong>SIMULATION CORE</strong></p>
+            <p>Physics Engine: Inverse Kinematics (SAT Collision)</p>
+            <p>Renderer: React SVG</p>
+            <p>Version: 3.1.0 (Refactored)</p>
+          </div>
         </aside>
       </main>
     </div>

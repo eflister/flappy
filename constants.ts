@@ -1,104 +1,108 @@
+
 /**
  * CONSTANTS.TS
  * 
- * Single source of truth for the application.
- * Contains all physical dimensions, simulation constraints, and visual configuration.
- * All derived values in the app should be calculated relative to these roots.
+ * The Single Source of Truth for physical dimensions and visual styles.
+ * 
+ * ARCHITECTURE NOTE:
+ * All dimensions are in "Simulated Pixels" where 1px approx 1mm.
+ * Variables are grouped by physical component to ensure modularity.
  */
 
 // ==========================================
-// 1. Simulation Limits & Defaults
+// 1. Physical Dimensions (The "Model")
 // ==========================================
-export const SIM_LIMITS = {
-  // Flap Length Constraints (px)
-  FLAP_HEIGHT: { MIN: 100, MAX: 400, DEFAULT: 125 },
-  // Spacing between Main Pivot and Motor Pivot (px)
-  MOTOR_SPACING: { MIN: 80, MAX: 300, DEFAULT: 120 },
-  // Animation Control
-  SPEED: { MIN: 0, MAX: 1, STEP: 0.01, DEFAULT: 0 },
-  // Actuator Extension (%)
-  EXTENSION: { MIN: 0, MAX: 100, DEFAULT: 0 },
-};
 
-// ==========================================
-// 2. Physical Dimensions (Pixels approx. mm)
-// ==========================================
-export const DIMS = {
-  // Canvas Setup
-  CANVAS: { WIDTH: 800, MAX_HEIGHT: '100vh' },
-  
-  // Vinyl Window Frame Profile
-  FRAME: {
-    ORIGIN_X: 650,      // Right-side anchor point
-    WIDTH: 35,          // Total width of the vinyl profile
-    THICKNESS: 4,       // Wall thickness
-    CHANNEL_DEPTH: 25,  // Depth of the channel holding the insulation
-    LIP: 5,             // Small vinyl lip overlap
+export const DIMENSIONS = {
+  // Global Layout Anchors
+  LAYOUT: {
+    ORIGIN_X: 650,          // The right-side anchor of the window frame
+    TOP_MARGIN: 20,         // Canvas padding top
+    BOTTOM_PADDING: 40,     // Canvas padding bottom
   },
 
-  // Insulation Foam
+  // The Vinyl Frame Profile
+  FRAME: {
+    WIDTH: 35,
+    THICKNESS: 4,
+    CHANNEL_DEPTH: 25,      // How deep the insulation sits in the frame
+    LIP: 5,                 // The small vinyl overhang
+  },
+
+  // The Pink Insulation Foam
   INSULATION: {
     THICKNESS: 20,
-    SCREW_HOLE_SPACING: [10, 25, 40], // Relative offsets for bracket screws
+    SCREW_HOLES: [10, 25, 40], // Y-offsets for mounting screws relative to pivot
   },
 
-  // Mechanical Parts (Slotted Angle / Brackets)
-  MECH: {
+  // Mechanical Hardware (Brackets, Mounts)
+  MECHANICS: {
+    PIVOT_OFFSET_Y: 50,     // Distance from fixed bottom panel to pivot
+    FLAP_OFFSET_Y: 25,      // Distance from pivot to actual flap start
+    OVERLAP_REGION: 60,     // Overlap between top fixed panel and flap
     BRACKET_WIDTH: 15,
     BRACKET_LENGTH: 60,
-    MOUNT_HEIGHT: 20,       // Height of the small offset brackets
-    PIVOT_OFFSET_Y: 50,     // Distance from Top of Bottom Panel to Pivot Center
-    FLAP_OFFSET_Y: 25,      // Distance from Pivot Center to Bottom of Flap
-    OVERLAP_REGION: 60,     // Vertical overlap between Top Panel and Flap (when closed)
-    CONNECTION_DOT_RADIUS: 3,
-    TOP_MOUNT_MARGIN: 20,   // Clearance at top of mount (Aligned with magnet washer)
+    MOUNT_HEIGHT: 20,       // Height of the connector block on the flap
+    MOUNT_MARGIN_TOP: 20,   // Clearance for the nut on the mount
+    WASHER_THICKNESS: 4,
   },
 
-  // Motor & Actuator
+  // The Linear Actuator / Motor Assembly
   MOTOR: {
     WIDTH: 50,
     HEIGHT: 40,
     HINGE_THICKNESS: 5,
-    HINGE_LEAF_LENGTH: 70,
-    PLATE_HEIGHT: 60,       // Mounting plate height
-    TOP_CLEARANCE: 30,      // Gap between frame and motor mount
+    HINGE_LEAF_LENGTH: 70,  // Length of the metal strap holding the motor
+    PLATE_HEIGHT: 60,       // Wall mounting plate height
     ROD_THICKNESS: 8,
-    STOPPER_SIZE: 12,
     PIN_RADIUS: 4,
+    STOPPER_WIDTH: 5,
   },
 
-  // Hardware
-  NUT: { WIDTH: 18, HEIGHT: 10 },
-  SEAL: { WIDTH: 12, HEIGHT: 4 }, // 2*rx, 2*ry
-  MAGNET: { WIDTH: 6, HEIGHT: 12 },
-  
-  // Layout
-  LAYOUT: {
-    TOP_MARGIN: 20,
-    // Bottom panel height is now calculated dynamically
+  // Small Hardware Details
+  HARDWARE: {
+    NUT_WIDTH: 18,
+    NUT_HEIGHT: 10,
+    MAGNET_W: 6,
+    MAGNET_H: 12,
+    SEAL_W: 12,
+    SEAL_H: 4,
   },
 };
 
 // ==========================================
-// 3. Visual Styles & Colors
+// 2. Simulation Constraints (The "Rules")
 // ==========================================
+
+export const CONSTRAINTS = {
+  // User Input Limits
+  FLAP_HEIGHT:   { MIN: 100, MAX: 400, DEFAULT: 125 },
+  MOTOR_SPACING: { MIN: 80,  MAX: 300, DEFAULT: 120 },
+  SPEED:         { MIN: 0,   MAX: 2,   DEFAULT: 0,   STEP: 0.1 },
+  EXTENSION:     { MIN: 0,   MAX: 100, DEFAULT: 0 }, // Percent
+  
+  // Physics Solver Limits
+  COLLISION: {
+    START_ANGLE: 0,
+    END_ANGLE: -160,
+    PRECISION: 0.5, // Degrees per step
+  },
+};
+
+// ==========================================
+// 3. Visual Styling (The "View")
+// ==========================================
+
 export const STYLES = {
   COLORS: {
-    VINYL: { FILL: "#f1f5f9", STROKE: "#64748b" },
-    INSULATION: { FILL: "#f9a8d4", STROKE: "#db2777", TEXT: "#be185d" },
-    METAL: { FILL: "#cbd5e1", STROKE: "#475569", HOLE: "#f1f5f9" },
-    BRASS: "#fbbf24",     // For pins and nuts
-    BRACKET: "#94a3b8",   // Darker metal
-    WASHER: "#1e293b",    // Rubber seals/washers
-    MAGNET: "#1e293b",
-    MOTOR: "#475569",
+    VINYL:      { FILL: "#f1f5f9", STROKE: "#64748b" },
+    INSULATION: { FILL: "#f9a8d4", STROKE: "#db2777" },
+    METAL:      { FILL: "#cbd5e1", STROKE: "#475569", DARK: "#475569" },
+    BRASS:      { FILL: "#fbbf24", STROKE: "#b45309", DARK: "#78350f" },
+    SEALS:      "#1e293b",
   },
-  STROKE_WIDTH: {
+  STROKE: {
     DEFAULT: 1.5,
-    THIN: 1,
-  },
-  CORNER_RADIUS: {
-    DEFAULT: 1,
-    LARGE: 4,
+    DASHED: "2,2",
   },
 };
