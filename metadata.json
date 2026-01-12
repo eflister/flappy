@@ -1,0 +1,5 @@
+{
+  "name": "DIY Window Vent Simulator",
+  "description": "A physics-based visualization of a linear-actuated window ventilation system using pink insulation and slotted angle mechanics.",
+  "requestFramePermissions": []
+}
