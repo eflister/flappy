@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Controls } from './components/Controls';
 import { SimulationCanvas } from './components/SimulationCanvas';
@@ -77,12 +76,6 @@ export default function App() {
             config={config} 
             onChange={handleConfigChange}
           />
-          <div className="mt-8 p-4 bg-slate-50 rounded text-[10px] text-slate-400 font-mono leading-relaxed">
-            <p><strong>SIMULATION CORE</strong></p>
-            <p>Physics Engine: Inverse Kinematics (SAT Collision)</p>
-            <p>Renderer: React SVG</p>
-            <p>Version: 3.1.0 (Refactored)</p>
-          </div>
         </aside>
       </main>
     </div>

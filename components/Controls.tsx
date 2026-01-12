@@ -9,7 +9,6 @@ interface ControlsProps {
   onChange: (key: keyof SimulationConfig, value: number) => void;
 }
 
-// Reusable slider row to reduce repetition
 const ControlRow: React.FC<{
   label: string;
   value: number;
@@ -37,30 +36,32 @@ const ControlRow: React.FC<{
 );
 
 export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
-  // Logic: 0% Extension = Closed = Slider Right
-  // 100% Extension = Open = Slider Left
-  // User wants a "Closed -> Open" slider visual, usually 0 -> 100.
-  // We map directly: 0% Ext (Closed) to 0 Slider.
   const isPlaying = config.animationSpeed > 0;
+  const visualPosValue = 100 - config.actuatorExtension;
+
+  const handlePosChange = (visualVal: number) => {
+    onChange('actuatorExtension', 100 - visualVal);
+    if (isPlaying) onChange('animationSpeed', 0);
+  };
 
   return (
     <div className="flex flex-col gap-1 w-full max-w-md mx-auto pt-2">
       
-      {/* Top Section: Playback & Actuation */}
-      <div className="flex items-center gap-2 h-8 select-none mb-2 border-b border-slate-100 pb-2">
+      {/* Top Row: Play | Hz | Position */}
+      <div className="flex items-center gap-3 h-8 select-none">
         
-        {/* Play/Pause Button */}
+        {/* Play/Pause */}
         <button 
           onClick={() => onChange('animationSpeed', isPlaying ? 0 : 0.5)}
-          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${isPlaying ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-100 text-slate-600'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center w-8 h-8 ${isPlaying ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-100 text-slate-600'}`}
           title={isPlaying ? "Pause Animation" : "Play Animation"}
         >
           {isPlaying ? <Pause size={14} /> : <Play size={14} />}
         </button>
 
-        {/* Speed Slider */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 border-r border-slate-200 pr-2 mr-2">
-          <label className="text-[10px] font-bold text-slate-500">SPEED</label>
+        {/* Hz Control */}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs font-bold text-slate-700">Hz</label>
           <input
             type="range"
             min={CONSTRAINTS.SPEED.MIN}
@@ -68,31 +69,34 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
             step={CONSTRAINTS.SPEED.STEP}
             value={config.animationSpeed}
             onChange={(e) => onChange('animationSpeed', parseFloat(e.target.value))}
-            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-400"
+            className="w-16 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700"
           />
+          <div className="text-xs font-mono text-slate-500 w-6 text-right">{config.animationSpeed}</div>
         </div>
 
-        {/* Position Slider */}
-        <div className="flex items-center gap-2 flex-[1.5] min-w-0">
-          <label className="text-[10px] font-bold text-slate-700">POS</label>
+        {/* Position Control */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs font-bold text-slate-700 truncate shrink-0 w-16 text-right">
+            {Math.round(config.actuatorExtension)}% Open
+          </span>
+          
           <input
             type="range"
             min={0}
             max={100}
-            value={config.actuatorExtension}
-            onChange={(e) => {
-              onChange('actuatorExtension', parseFloat(e.target.value));
-              if (isPlaying) onChange('animationSpeed', 0); // Stop animation on manual drag
-            }}
-            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            value={visualPosValue}
+            onChange={(e) => handlePosChange(parseFloat(e.target.value))}
+            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600 min-w-10"
+            title="Drag Left to Open, Right to Close"
           />
-           <div className="text-[10px] font-mono text-slate-500 w-8 text-right shrink-0">
-            {Math.round(config.actuatorExtension)}%
-          </div>
+          
+          <span className="text-xs font-bold text-slate-700 shrink-0 w-10">
+            Close
+          </span>
         </div>
       </div>
 
-      {/* Configuration Section */}
+      {/* Row 2: Flap Length */}
       <ControlRow
         label="Flap Length"
         value={config.flapHeight}
@@ -102,6 +106,7 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
         onChange={(v) => onChange('flapHeight', v)}
       />
 
+      {/* Row 3: Motor Spacing */}
       <ControlRow
         label="Motor Spacing"
         value={config.motorSpacing}

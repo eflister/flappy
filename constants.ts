@@ -32,7 +32,7 @@ export const DIMENSIONS = {
   // The Pink Insulation Foam
   INSULATION: {
     THICKNESS: 20,
-    SCREW_HOLES: [10, 25, 40], // Y-offsets for mounting screws relative to pivot
+    SCREW_HOLES: [0, 15, 30, 45], // Added 0 for pivot alignment, regular spacing
   },
 
   // Mechanical Hardware (Brackets, Mounts)
@@ -40,7 +40,7 @@ export const DIMENSIONS = {
     PIVOT_OFFSET_Y: 50,     // Distance from fixed bottom panel to pivot
     FLAP_OFFSET_Y: 25,      // Distance from pivot to actual flap start
     OVERLAP_REGION: 60,     // Overlap between top fixed panel and flap
-    BRACKET_WIDTH: 15,
+    BRACKET_WIDTH: 12,      // Reduced from 15 to minimize overhang
     BRACKET_LENGTH: 60,
     MOUNT_HEIGHT: 20,       // Height of the connector block on the flap
     MOUNT_MARGIN_TOP: 20,   // Clearance for the nut on the mount
@@ -61,7 +61,7 @@ export const DIMENSIONS = {
 
   // Small Hardware Details
   HARDWARE: {
-    NUT_WIDTH: 18,
+    NUT_WIDTH: 12,
     NUT_HEIGHT: 10,
     MAGNET_W: 6,
     MAGNET_H: 12,
