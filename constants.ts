@@ -12,8 +12,8 @@
 export const SIM_LIMITS = {
   // Flap Length Constraints (px)
   FLAP_HEIGHT: { MIN: 100, MAX: 400, DEFAULT: 125 },
-  // Top Panel Height Constraints (px)
-  TOP_PANEL_HEIGHT: { MIN: 160, MAX: 350, DEFAULT: 200 },
+  // Spacing between Main Pivot and Motor Pivot (px)
+  MOTOR_SPACING: { MIN: 80, MAX: 300, DEFAULT: 120 },
   // Animation Control
   SPEED: { MIN: 0, MAX: 1, STEP: 0.01, DEFAULT: 0 },
   // Actuator Extension (%)
@@ -51,16 +51,7 @@ export const DIMS = {
     FLAP_OFFSET_Y: 25,      // Distance from Pivot Center to Bottom of Flap
     OVERLAP_REGION: 60,     // Vertical overlap between Top Panel and Flap (when closed)
     CONNECTION_DOT_RADIUS: 3,
-  },
-
-  // Slide Mechanism (Drawer Slide / Linear Guide)
-  SLIDE: {
-    HOUSING_WIDTH: 12,      // Outer rail width
-    INNER_WIDTH: 8,         // Inner rail width
-    OFFSET_X: 60,           // Horizontal distance from Pivot to Slide center
-    TOP_MARGIN: 20,         // Clearance at top of slide (Aligned with magnet washer)
-    BOTTOM_MARGIN: 20,      // Clearance at bottom of slide
-    RAIL_NUT_EXTENSION: 15, // How far the inner rail extends UP past the nut
+    TOP_MOUNT_MARGIN: 20,   // Clearance at top of mount (Aligned with magnet washer)
   },
 
   // Motor & Actuator
@@ -84,7 +75,7 @@ export const DIMS = {
   // Layout
   LAYOUT: {
     TOP_MARGIN: 20,
-    BOTTOM_PANEL_HEIGHT: 110,
+    // Bottom panel height is now calculated dynamically
   },
 };
 
@@ -101,7 +92,6 @@ export const STYLES = {
     WASHER: "#1e293b",    // Rubber seals/washers
     MAGNET: "#1e293b",
     MOTOR: "#475569",
-    SLIDE_STROKE: "#475569",
   },
   STROKE_WIDTH: {
     DEFAULT: 1.5,

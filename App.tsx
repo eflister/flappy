@@ -7,7 +7,7 @@ import { SIM_LIMITS } from './constants';
 const INITIAL_CONFIG: SimulationConfig = {
   actuatorExtension: SIM_LIMITS.EXTENSION.DEFAULT,
   flapHeight: SIM_LIMITS.FLAP_HEIGHT.DEFAULT,
-  topPanelHeight: SIM_LIMITS.TOP_PANEL_HEIGHT.DEFAULT,
+  motorSpacing: SIM_LIMITS.MOTOR_SPACING.DEFAULT,
   animationSpeed: SIM_LIMITS.SPEED.DEFAULT,
 };
 
