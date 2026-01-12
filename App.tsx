@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Controls } from './components/Controls';
 import { SimulationCanvas } from './components/SimulationCanvas';
@@ -62,22 +63,20 @@ export default function App() {
   }, [config.animationSpeed]); // Re-bind if speed toggle changes to avoid stale state logic
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 overflow-hidden">
-      <main className="flex-1 flex flex-col lg:flex-row min-h-screen">
+    <div className="h-screen bg-slate-50 flex flex-col font-sans text-slate-900 overflow-hidden">
         
-        {/* Left: Visualization (Flexible growth) */}
-        <section className="relative bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-200 lg:flex-1 flex justify-center items-center">
-           <SimulationCanvas config={config} />
-        </section>
+      {/* Top: Visualization (Flexible growth) */}
+      <section className="flex-1 min-h-0 relative flex justify-center items-center overflow-hidden">
+          <SimulationCanvas config={config} />
+      </section>
 
-        {/* Right: Controls (Fixed Width) */}
-        <aside className="w-full lg:w-96 flex-shrink-0 bg-white p-4 overflow-y-auto shadow-xl z-20">
-          <Controls 
-            config={config} 
-            onChange={handleConfigChange}
-          />
-        </aside>
-      </main>
+      {/* Bottom: Controls (Fixed Height) */}
+      <aside className="w-full shrink-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
+        <Controls 
+          config={config} 
+          onChange={handleConfigChange}
+        />
+      </aside>
     </div>
   );
 }

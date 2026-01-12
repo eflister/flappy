@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { SimulationConfig } from '../types';
 import { CONSTRAINTS } from '../constants';
 import { Play, Pause } from 'lucide-react';
@@ -16,8 +16,9 @@ const ControlRow: React.FC<{
   max: number;
   step?: number;
   unit?: string;
+  showValue?: boolean;
   onChange: (val: number) => void;
-}> = ({ label, value, min, max, step = 1, unit = '', onChange }) => (
+}> = ({ label, value, min, max, step = 1, unit = '', showValue = true, onChange }) => (
   <div className="flex items-center gap-3 h-8 select-none">
     <label className="text-xs font-bold text-slate-700 w-24 shrink-0 truncate" title={label}>{label}</label>
     <input
@@ -29,19 +30,58 @@ const ControlRow: React.FC<{
       onChange={(e) => onChange(parseFloat(e.target.value))}
       className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700 min-w-20"
     />
-    <div className="text-xs font-mono text-slate-500 w-12 text-right shrink-0">
-      {Math.round(value)}{unit}
-    </div>
+    {showValue && (
+      <div className="text-xs font-mono text-slate-500 w-12 text-right shrink-0">
+        {Math.round(value)}{unit}
+      </div>
+    )}
   </div>
 );
 
 export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
   const isPlaying = config.animationSpeed > 0;
   const visualPosValue = 100 - config.actuatorExtension;
+  const animationRef = useRef<number>();
 
   const handlePosChange = (visualVal: number) => {
-    onChange('actuatorExtension', 100 - visualVal);
+    // Stop any ongoing target animation if manual drag occurs
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
     if (isPlaying) onChange('animationSpeed', 0);
+    onChange('actuatorExtension', 100 - visualVal);
+  };
+
+  const animateTo = (targetExtension: number) => {
+    // Stop the oscillator if running
+    if (isPlaying) onChange('animationSpeed', 0);
+    
+    // Cancel previous manual animation
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
+    const start = config.actuatorExtension;
+    const change = targetExtension - start;
+    if (Math.abs(change) < 0.1) return; // Already there
+
+    const duration = 800; // ms
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      
+      // EaseInOutQuad
+      const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      
+      const currentVal = start + (change * ease);
+      onChange('actuatorExtension', currentVal);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(tick);
+      } else {
+        animationRef.current = undefined;
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(tick);
   };
 
   return (
@@ -61,7 +101,6 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
 
         {/* Hz Control */}
         <div className="flex items-center gap-2 shrink-0">
-          <label className="text-xs font-bold text-slate-700">Hz</label>
           <input
             type="range"
             min={CONSTRAINTS.SPEED.MIN}
@@ -71,28 +110,47 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
             onChange={(e) => onChange('animationSpeed', parseFloat(e.target.value))}
             className="w-16 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700"
           />
-          <div className="text-xs font-mono text-slate-500 w-6 text-right">{config.animationSpeed}</div>
+          <div className="text-xs font-mono text-slate-500 w-auto text-right whitespace-nowrap">
+            {config.animationSpeed} <span className="font-bold text-slate-700 ml-1">Hz</span>
+          </div>
         </div>
 
-        {/* Position Control */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs font-bold text-slate-700 truncate shrink-0 w-16 text-right">
-            {Math.round(config.actuatorExtension)}% Open
-          </span>
+        {/* Position Control Group */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end ml-2">
           
+          {/* Percentage Label */}
+          <div className="text-xs font-mono text-slate-500 w-9 text-right shrink-0">
+             {Math.round(config.actuatorExtension)}%
+          </div>
+
+          {/* Open Button */}
+          <button 
+            onClick={() => animateTo(100)}
+            className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2 py-1 bg-white hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm shrink-0"
+            title="Animate to Fully Open"
+          >
+            Open
+          </button>
+          
+          {/* Slider */}
           <input
             type="range"
             min={0}
             max={100}
             value={visualPosValue}
             onChange={(e) => handlePosChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600 min-w-10"
+            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600 min-w-[30px]"
             title="Drag Left to Open, Right to Close"
           />
           
-          <span className="text-xs font-bold text-slate-700 shrink-0 w-10">
+          {/* Close Button */}
+          <button 
+            onClick={() => animateTo(0)}
+            className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2 py-1 bg-white hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm shrink-0"
+            title="Animate to Fully Closed"
+          >
             Close
-          </span>
+          </button>
         </div>
       </div>
 
@@ -103,6 +161,7 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
         min={CONSTRAINTS.FLAP_HEIGHT.MIN}
         max={CONSTRAINTS.FLAP_HEIGHT.MAX}
         unit="px"
+        showValue={false}
         onChange={(v) => onChange('flapHeight', v)}
       />
 
@@ -113,6 +172,7 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
         min={CONSTRAINTS.MOTOR_SPACING.MIN}
         max={CONSTRAINTS.MOTOR_SPACING.MAX}
         unit="px"
+        showValue={false}
         onChange={(v) => onChange('motorSpacing', v)}
       />
     </div>
