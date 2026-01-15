@@ -44,22 +44,18 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
   const animationRef = useRef<number>();
 
   const handlePosChange = (visualVal: number) => {
-    // Stop any ongoing target animation if manual drag occurs
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     if (isPlaying) onChange('animationSpeed', 0);
     onChange('actuatorExtension', 100 - visualVal);
   };
 
   const animateTo = (targetExtension: number) => {
-    // Stop the oscillator if running
     if (isPlaying) onChange('animationSpeed', 0);
-    
-    // Cancel previous manual animation
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
     const start = config.actuatorExtension;
     const change = targetExtension - start;
-    if (Math.abs(change) < 0.1) return; // Already there
+    if (Math.abs(change) < 0.1) return;
 
     const duration = 800; // ms
     const startTime = performance.now();
@@ -67,10 +63,7 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
     const tick = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / duration);
-      
-      // EaseInOutQuad
       const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
-      
       const currentVal = start + (change * ease);
       onChange('actuatorExtension', currentVal);
 
@@ -118,12 +111,10 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
         {/* Position Control Group */}
         <div className="flex items-center gap-2 flex-1 min-w-0 justify-end ml-2">
           
-          {/* Percentage Label */}
           <div className="text-xs font-mono text-slate-500 w-9 text-right shrink-0">
              {Math.round(config.actuatorExtension)}%
           </div>
 
-          {/* Open Button */}
           <button 
             onClick={() => animateTo(100)}
             className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2 py-1 bg-white hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm shrink-0"
@@ -132,7 +123,6 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
             Open
           </button>
           
-          {/* Slider */}
           <input
             type="range"
             min={0}
@@ -143,7 +133,6 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
             title="Drag Left to Open, Right to Close"
           />
           
-          {/* Close Button */}
           <button 
             onClick={() => animateTo(0)}
             className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2 py-1 bg-white hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm shrink-0"
@@ -154,24 +143,24 @@ export const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
         </div>
       </div>
 
-      {/* Row 2: Flap Length */}
+      {/* Row 2: Gap Height */}
       <ControlRow
-        label="Flap Length"
-        value={config.flapHeight}
-        min={CONSTRAINTS.FLAP_HEIGHT.MIN}
-        max={CONSTRAINTS.FLAP_HEIGHT.MAX}
+        label="Vent Height"
+        value={config.gapHeight}
+        min={CONSTRAINTS.GAP_HEIGHT.MIN}
+        max={CONSTRAINTS.GAP_HEIGHT.MAX}
         unit="px"
         showValue={false}
-        onChange={(v) => onChange('flapHeight', v)}
+        onChange={(v) => onChange('gapHeight', v)}
       />
 
-      {/* Row 3: Motor Spacing */}
+      {/* Row 3: Motor Offset */}
       <ControlRow
-        label="Motor Spacing"
+        label="Motor Offset"
         value={config.motorSpacing}
         min={CONSTRAINTS.MOTOR_SPACING.MIN}
         max={CONSTRAINTS.MOTOR_SPACING.MAX}
-        unit="px"
+        unit="mm"
         showValue={false}
         onChange={(v) => onChange('motorSpacing', v)}
       />

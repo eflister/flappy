@@ -8,9 +8,9 @@ import { CONSTRAINTS } from './constants';
 // Initial Application State
 const INITIAL_CONFIG: SimulationConfig = {
   actuatorExtension: CONSTRAINTS.EXTENSION.DEFAULT,
-  flapHeight:        CONSTRAINTS.FLAP_HEIGHT.DEFAULT,
-  motorSpacing:      CONSTRAINTS.MOTOR_SPACING.DEFAULT,
+  gapHeight:         CONSTRAINTS.GAP_HEIGHT.DEFAULT,
   animationSpeed:    CONSTRAINTS.SPEED.DEFAULT,
+  motorSpacing:      CONSTRAINTS.MOTOR_SPACING.DEFAULT,
 };
 
 export default function App() {
@@ -31,10 +31,6 @@ export default function App() {
     const animate = (time: number) => {
       if (lastTimeRef.current !== 0 && config.animationSpeed > 0) {
         const deltaTime = time - lastTimeRef.current;
-        
-        // Calculate step based on frequency (Hz)
-        // 1 Hz = Full Open (0->100) + Full Close (100->0) in 1 second? 
-        // Let's define speed as "Cycles per second". One cycle distance = 200 units (0->100->0).
         const distancePerSec = 200 * config.animationSpeed; 
         const moveStep = (distancePerSec * deltaTime) / 1000;
         
@@ -60,17 +56,17 @@ export default function App() {
 
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current);
-  }, [config.animationSpeed]); // Re-bind if speed toggle changes to avoid stale state logic
+  }, [config.animationSpeed]);
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans text-slate-900 overflow-hidden">
         
-      {/* Top: Visualization (Flexible growth) */}
+      {/* Top: Visualization */}
       <section className="flex-1 min-h-0 relative flex justify-center items-center overflow-hidden">
           <SimulationCanvas config={config} />
       </section>
 
-      {/* Bottom: Controls (Fixed Height) */}
+      {/* Bottom: Controls */}
       <aside className="w-full shrink-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
         <Controls 
           config={config} 

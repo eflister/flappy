@@ -5,246 +5,271 @@
  * The Brain of the application.
  * 
  * Responsibilities:
- * 1. Calculate static geometry based on config (Flap length, spacing).
- * 2. Solve kinematics (Inverse & Forward) to determine positions at specific angles.
- * 3. Perform collision detection to find physical limits.
+ * 1. Calculate static geometry based on config (Gap Height).
+ * 2. Solve kinematics (Intersection of Linkage Circles).
+ * 3. Perform collision detection (Bar vs Shaft) to find Max Open Angle.
  * 4. Return a complete 'SystemState' object for the renderer.
  */
 
 import { useMemo } from 'react';
-import { SimulationConfig, SystemState, Point } from '../types';
+import { SimulationConfig, SystemState } from '../types';
 import { DIMENSIONS, CONSTRAINTS } from '../constants';
-import { rotatePoint, getDistance, getAngle, polygonsIntersect } from '../utils/geometry';
+import { getDistance } from '../utils/geometry';
 
 export const useSimulationPhysics = (config: SimulationConfig): SystemState => {
-  // Destructure config for readability
-  const { flapHeight, motorSpacing, actuatorExtension } = config;
+  const { gapHeight, actuatorExtension, motorSpacing } = config;
   const { FRAME, INSULATION, MECHANICS, MOTOR, LAYOUT, HARDWARE } = DIMENSIONS;
 
   // =========================================================================
-  // 1. Static Geometry Calculation
-  //    Coordinates that do not change when the window opens/closes.
+  // 1. Static Geometry Calculation (Top-Down Dependency Chain)
   // =========================================================================
   const staticGeo = useMemo(() => {
-    // Y-Axis increases downwards
-    const topPanelBottomY   = LAYOUT.TOP_MARGIN + FRAME.THICKNESS + 100; // Fixed top panel height 100
-    const flapTopY_Closed   = topPanelBottomY - MECHANICS.OVERLAP_REGION;
-    const flapBottomY_Closed= flapTopY_Closed + flapHeight;
-    const pivotY            = flapBottomY_Closed + MECHANICS.FLAP_OFFSET_Y;
-    const motorPivotY       = pivotY + motorSpacing;
-
-    // X-Axis Layout
-    const centerLineX       = LAYOUT.ORIGIN_X + (FRAME.WIDTH / 2);
-    const fixedInsulationX  = centerLineX - (INSULATION.THICKNESS / 2);
-    // The flap sits exactly one thickness to the left of the fixed insulation
-    const flapX_Closed      = fixedInsulationX - INSULATION.THICKNESS; 
+    // --- Vertical Layout (Y) ---
+    const screenTopY = LAYOUT.TOP_MARGIN;
     
-    const bracketX          = flapX_Closed - MECHANICS.BRACKET_WIDTH;
-    const pivotX            = bracketX + (MECHANICS.BRACKET_WIDTH / 2);
-    const motorPivotX       = fixedInsulationX - (MOTOR.HINGE_THICKNESS / 2);
-
-    // Calculate Mount Length (Inverse Kinematics for Hardware)
-    // We need to size the bracket connecting the flap to the rod so it *just* clears the motor assembly.
-    const obstaclePoint = { x: bracketX - 5, y: pivotY + 10 }; // Corner of the metal bracket
-    const motorPivot    = { x: motorPivotX, y: motorPivotY };
+    // 1. Top Panel (Fixed)
+    // "flush to the inner surface of the vinyl frame"
+    const topPanelTopY = screenTopY + FRAME.THICKNESS;
+    const topPanelBottomY = topPanelTopY + LAYOUT.TOP_PANEL_H;
     
-    // Position of the nut relative to the pivot center (Unrotated/Closed)
-    // The nut aligns with the top magnet/washer position for symmetry
-    const localNutY     = -(flapHeight + MECHANICS.FLAP_OFFSET_Y) + MECHANICS.MOUNT_MARGIN_TOP + (MECHANICS.MOUNT_HEIGHT / 2);
-    const globalNutY    = pivotY + localNutY;
-
-    // Math: Find X on the line from MotorPivot through Obstacle at Y = globalNutY
-    // Slope formula: m = dy/dx
-    const slope         = (obstaclePoint.y - motorPivot.y) / (obstaclePoint.x - motorPivot.x);
-    // x = x1 + (y - y1) / m
-    const requiredNutX  = motorPivot.x + (globalNutY - motorPivot.y) / slope;
+    // 2. Bottom Panel (Fixed) - Determined by GAP HEIGHT
+    const botPanelTopY = topPanelBottomY + gapHeight;
     
-    // Ensure minimum length of 30px, otherwise use calculated clearance
-    const mountLength   = Math.max(30, flapX_Closed - requiredNutX);
+    // 3. Flap Geometry (Derived from Gap + Overlaps + Headroom)
+    // Flap top is higher than the overlap start to hold the striker
+    const flapTopY_Closed = topPanelBottomY - MECHANICS.OVERLAP_TOP - MECHANICS.FLAP_HEADROOM;
+    const flapBottomY_Closed = botPanelTopY + MECHANICS.OVERLAP_BOTTOM;
+    const flapHeight = flapBottomY_Closed - flapTopY_Closed;
+
+    // 4. Pivot Position (Offset below the flap bottom edge)
+    const pivotY = flapBottomY_Closed + MECHANICS.PIVOT_OFFSET_Y;
+
+    // 5. Motor Position (Fixed relative to Pivot)
+    const motorCenterY = pivotY + MOTOR.DIST_BELOW_PIVOT;
+
+    // --- Horizontal Layout (X) ---
+    // Start from Frame Right Edge (Exterior)
+    const screenRightX = LAYOUT.ORIGIN_X + FRAME.WIDTH;
+    const frameCenterX = LAYOUT.ORIGIN_X + (FRAME.WIDTH / 2);
+    
+    // Fixed Insulation is Centered in Frame
+    const fixedInsulationRightX = frameCenterX + (INSULATION.THICKNESS / 2);
+    const fixedInsulationLeftX  = frameCenterX - (INSULATION.THICKNESS / 2);
+    const insulationX = fixedInsulationLeftX; 
+
+    // Stack Order (Right to Left): 
+    // FixedPanel -> Seal -> Flap -> Bar -> Pivot -> Motor
+    
+    // Flap Closed Position
+    // REQUIREMENT: "when the flap is closed it should be flush against the back panel"
+    // So the right face of the flap is at fixedInsulationLeftX.
+    const flapRightX_Closed = fixedInsulationLeftX;
+    
+    // Flap Left Face
+    const flapLeftX_Closed = flapRightX_Closed - INSULATION.THICKNESS;
+    
+    // Bar is Flush with Flap Left Face
+    const barRightX = flapLeftX_Closed;
+    const barLeftX = barRightX - MECHANICS.BAR_WIDTH;
+    
+    // Pivot is Center of Bar (or pin goes through it)
+    const pivotX = barLeftX + (MECHANICS.BAR_WIDTH / 2);
+    
+    // Motor is spaced from Pivot by user config (Slider)
+    const motorCenterX = pivotX - motorSpacing;
+
+    // --- Linkage Geometry ---
+    // Bar Top Hole Y (in Closed state)
+    // Top hole is near the top of the flap structure
+    const topHoleGlobalY_Closed = flapTopY_Closed + 12; // Slightly down from top
+    
+    // Linkage Pin Local Coords (Relative to Pivot)
+    const mountHoleLocal = { 
+      x: 0, 
+      y: topHoleGlobalY_Closed - pivotY // Negative value (since pivot is below)
+    };
+    const flapMountRadius = Math.abs(mountHoleLocal.y);
+    const flapMountBaseAngle = -Math.PI / 2; // -90 deg (Up)
+
+    // --- Shaft Collision Solver (Analytic) ---
+    // Find Angle where Bar Edge hits Shaft/Motor components.
+    
+    // Define obstruction line X (Right edge of Shaft/Nut/Collar)
+    const shaftRightX = motorCenterX + (MOTOR.ROD_THICKNESS/2) + (MOTOR.SHAFT_END_CAP_H/2); 
+    const safetyX = shaftRightX + CONSTRAINTS.COLLISION.SAFETY_MARGIN;
+    
+    // Check collision angle
+    let maxAngleDeg = -45; // Default fallback
+    
+    // Intersection of circle arc with vertical line x = safetyX
+    if (Math.abs(safetyX - pivotX) < flapMountRadius) {
+       // We use asin relative to vertical (-90deg base)
+       // Since safetyX should be < pivotX, the argument is negative.
+       // The resulting angle is negative (tilting left/opening).
+       const val = (safetyX - pivotX) / flapMountRadius;
+       // Clamp to avoid numerical issues if safetyX ~ pivotX
+       const clampedVal = Math.max(-1, Math.min(1, val));
+       const angleRelRad = Math.asin(clampedVal);
+       maxAngleDeg = angleRelRad * 180 / Math.PI;
+    }
+    
+    // IMPORTANT: Ensure flap never tilts "into" the panel (positive angle).
+    // It must strictly be <= 0.
+    maxAngleDeg = Math.min(0, maxAngleDeg);
+    
+    // Clamp lower bound (max open limit of the hinge itself, e.g. 170 deg)
+    maxAngleDeg = Math.max(-170, maxAngleDeg);
+
+    // --- Dynamic Limits Calculations ---
+    
+    // 1. Closed State (Angle 0)
+    // Pin at topHoleGlobalY_Closed. Nut on Shaft.
+    const pinClosed = { x: pivotX, y: topHoleGlobalY_Closed };
+    const dxClosed = Math.abs(motorCenterX - pinClosed.x);
+    const dyLinkClosed = Math.sqrt(Math.max(0, MECHANICS.LINK_LENGTH**2 - dxClosed**2));
+    const nutY_Closed = pinClosed.y + dyLinkClosed;
+
+    // 2. Max Open State (Angle maxAngleDeg)
+    const maxRad = maxAngleDeg * Math.PI / 180;
+    const effAngle = maxRad + flapMountBaseAngle;
+    const pinOpen = {
+      x: pivotX + flapMountRadius * Math.cos(effAngle),
+      y: pivotY + flapMountRadius * Math.sin(effAngle)
+    };
+    const dxOpen = Math.abs(motorCenterX - pinOpen.x);
+    const dyLinkOpen = Math.sqrt(Math.max(0, MECHANICS.LINK_LENGTH**2 - dxOpen**2));
+    const nutY_Open = pinOpen.y + dyLinkOpen;
+
+    // Shaft Geometry
+    const shaftTopY = nutY_Closed - MOTOR.SHAFT_END_CAP_H - 10;
+    
+    // Limit Collar Position
+    const limitCollarY = nutY_Open + HARDWARE.NUT_HEIGHT/2;
+
+    // Hardware Locations
+    // Magnet is above the overlap area. 
+    // It sits on the face of the fixed panel.
+    const magnetY = topPanelBottomY - MECHANICS.OVERLAP_TOP/2 - HARDWARE.MAGNET_H/2 - HARDWARE.MAGNET_GAP;
+    // Striker aligns with magnet
+    const strikerY = magnetY; 
+
+    // --- Layout Calculations ---
+    // Ensure we have room for the motor (motorCenterY + height/2)
+    // Plus a gap for visual separation (20px)
+    // Plus the bottom frame thickness
+    const visualBottomY = motorCenterY + MOTOR.HEIGHT/2 + 40; 
 
     return {
       pivot: { x: pivotX, y: pivotY },
-      motorPivot: { x: motorPivotX, y: motorPivotY },
-      flapX: flapX_Closed,
-      fixedX: fixedInsulationX,
-      mountLength,
-      localNutY, // Store local Y for rotation calculations later
+      motorPos: { x: motorCenterX, y: motorCenterY },
+      flapMountRadius,
+      flapMountBaseAngle,
+      magnetY,
+      strikerY,
+      topPanelBottomY,
+      topPanelTopY,
+      botPanelTopY,
+      mountHoleLocal,
+      maxAngleDeg,
+      limitCollarY,
+      shaftTopY,
+      flapHeight,
+      overlapTop: MECHANICS.OVERLAP_TOP,
+      overlapBottom: MECHANICS.OVERLAP_BOTTOM,
+      barLength: Math.abs(mountHoleLocal.y) + MECHANICS.BAR_EXTENSION_ABOVE,
       
-      // Bounds for frame drawing
-      screenBottomY: motorPivotY + 80 + FRAME.CHANNEL_DEPTH + FRAME.THICKNESS,
-      screenRightX: LAYOUT.ORIGIN_X + FRAME.WIDTH,
-      topPanelBottomY
+      // Layout Bounds for ViewBox
+      bracketTopY: pivotY, 
+      bracketBottomY: pivotY,
+      nutY_Open,
+      nutY_Closed, 
+      screenRightX,
+      screenTopY,
+      screenBottomY: visualBottomY, // Use extended bottom
+      canvasHeight: visualBottomY + 50,
+      insulationX, // This is the interface line between fixed and flap
+      fixedPanelRightX: fixedInsulationRightX,
     };
-  }, [flapHeight, motorSpacing]); // Only recalculate if physical dims change
+  }, [gapHeight, motorSpacing]); // Re-run when config changes
 
   // =========================================================================
   // 2. Kinematic Solver
-  //    Calculates the position of all moving parts for a specific angle.
   // =========================================================================
+  
   const solveKinematics = (angleDeg: number) => {
     const angleRad = angleDeg * Math.PI / 180;
-
-    // A. Calculate Nut Position (Orbiting the Main Pivot)
-    // Note: localNutX is negative because it's to the left of the flap face
-    const localNutX = (staticGeo.flapX - staticGeo.mountLength) - staticGeo.pivot.x;
-    const nutGlobal = rotatePoint(
-      { x: staticGeo.pivot.x + localNutX, y: staticGeo.pivot.y + staticGeo.localNutY },
-      staticGeo.pivot,
-      angleRad
-    );
-
-    // B. Calculate Motor Body Angle (Pointing at Nut)
-    // The shaft is offset from the motor center, so we need arcsin correction.
-    const motorOffset     = -((MOTOR.HINGE_THICKNESS / 2) + (MOTOR.HEIGHT / 2));
-    const distPivotToNut  = getDistance(staticGeo.motorPivot, nutGlobal);
-    const directAngle     = getAngle(staticGeo.motorPivot, nutGlobal);
+    const effectiveAngle = angleRad + staticGeo.flapMountBaseAngle;
     
-    // Correction angle because the rod doesn't come out of the center
-    // Clamp value to -1/1 to prevent Math.asin NaN errors on impossible geometries
-    const angleCorrection = Math.asin(Math.max(-1, Math.min(1, motorOffset / distPivotToNut)));
-    const motorAngleRad   = directAngle - angleCorrection;
-
-    // C. Calculate Shaft Start Point
-    // It starts at the end of the hinge leaf, rotated by the motor angle
-    const shaftStartLocal = { x: MOTOR.HINGE_LEAF_LENGTH, y: motorOffset };
-    const shaftStartGlobal = rotatePoint(
-      { x: staticGeo.motorPivot.x + shaftStartLocal.x, y: staticGeo.motorPivot.y + shaftStartLocal.y },
-      staticGeo.motorPivot,
-      motorAngleRad
-    );
-
-    return {
-      nutGlobal,
-      motorAngleRad,
-      shaftStartGlobal,
-      distPivotToNut
+    const flapMount = {
+      x: staticGeo.pivot.x + staticGeo.flapMountRadius * Math.cos(effectiveAngle),
+      y: staticGeo.pivot.y + staticGeo.flapMountRadius * Math.sin(effectiveAngle)
     };
+
+    const dx = Math.abs(staticGeo.motorPos.x - flapMount.x);
+    const linkSq = MECHANICS.LINK_LENGTH ** 2;
+    const dxSq = dx * dx;
+    
+    const dy = Math.sqrt(Math.max(0, linkSq - dxSq));
+    const nutY = flapMount.y + dy;
+
+    const nut = { x: staticGeo.motorPos.x, y: nutY };
+    const linkAngleDeg = Math.atan2(flapMount.y - nut.y, flapMount.x - nut.x) * 180 / Math.PI;
+
+    return { flapMount, nut, linkAngleDeg };
   };
 
   // =========================================================================
-  // 3. Collision Detection & Max Angle Calculation
-  //    Determines the physical limit of the system.
+  // 3. System State Resolution
   // =========================================================================
+
+  const closedState = solveKinematics(0);
+  const openState = solveKinematics(staticGeo.maxAngleDeg);
   
-  // We determine the shaft length based on the CLOSED state (Angle 0).
-  // The rod is fixed length; the nut travels along it.
-  const zeroState = solveKinematics(0);
-  const fixedShaftLength = getDistance(zeroState.shaftStartGlobal, zeroState.nutGlobal) + 25; // +25mm buffer
-
-  const checkCollision = (angleDeg: number): boolean => {
-    const k = solveKinematics(angleDeg);
-    const rad = angleDeg * Math.PI / 180;
+  const travelDist = openState.nut.y - closedState.nut.y; 
+  const currentNutY = closedState.nut.y + ((actuatorExtension / 100) * travelDist);
+  
+  // Inverse Kinematics
+  const solveAngleFromNutY = (targetY: number) => {
+    const P = staticGeo.pivot;
+    const N = { x: staticGeo.motorPos.x, y: targetY };
     
-    // 1. Simple Distance Check: Nut hitting Motor Hinge
-    const minSafeDist = MOTOR.HINGE_LEAF_LENGTH + (HARDWARE.NUT_WIDTH / 2) + 2;
-    if (k.distPivotToNut < minSafeDist) return true;
-
-    // 2. Point Check: Motor Body hitting Fixed Wall
-    const motorCorners = [
-      { x: MOTOR.HINGE_LEAF_LENGTH, y: -MOTOR.HINGE_THICKNESS / 2 },
-      { x: MOTOR.HINGE_LEAF_LENGTH - MOTOR.WIDTH, y: -MOTOR.HINGE_THICKNESS / 2 - MOTOR.HEIGHT }
-    ];
-    for (const p of motorCorners) {
-      const globalP = rotatePoint(
-        { x: staticGeo.motorPivot.x + p.x, y: staticGeo.motorPivot.y + p.y },
-        staticGeo.motorPivot,
-        k.motorAngleRad
-      );
-      if (globalP.x > staticGeo.fixedX) return true;
-    }
-
-    // 3. SAT Check: Rod hitting Flap
-    // Define Flap Polygon (Rotated)
-    const flapW = INSULATION.THICKNESS;
-    const flapH = flapHeight;
-    // Local coordinates relative to Pivot
-    const flapTL = { x: staticGeo.flapX - staticGeo.pivot.x, y: -(MECHANICS.FLAP_OFFSET_Y + flapH) };
+    const d = getDistance(P, N);
+    const r1 = staticGeo.flapMountRadius;
+    const r2 = MECHANICS.LINK_LENGTH;
     
-    const polyFlap = [
-      rotatePoint({ x: staticGeo.pivot.x + flapTL.x, y: staticGeo.pivot.y + flapTL.y }, staticGeo.pivot, rad), // TL
-      rotatePoint({ x: staticGeo.pivot.x + flapTL.x + flapW, y: staticGeo.pivot.y + flapTL.y }, staticGeo.pivot, rad), // TR
-      rotatePoint({ x: staticGeo.pivot.x + flapTL.x + flapW, y: staticGeo.pivot.y + flapTL.y + flapH }, staticGeo.pivot, rad), // BR
-      rotatePoint({ x: staticGeo.pivot.x + flapTL.x, y: staticGeo.pivot.y + flapTL.y + flapH }, staticGeo.pivot, rad), // BL
-    ];
-
-    // Define Rod Polygon (Rotated by Motor Angle)
-    // Rod vector
-    const rodDir = {
-      x: Math.cos(k.motorAngleRad),
-      y: Math.sin(k.motorAngleRad)
-    };
-    // Perpendicular vector for thickness
-    const perp = { x: -rodDir.y, y: rodDir.x };
-    const halfThick = (MOTOR.ROD_THICKNESS / 2) + 1; // +1 Safety
-
-    const p1 = k.shaftStartGlobal;
-    const p2 = { x: p1.x + rodDir.x * fixedShaftLength, y: p1.y + rodDir.y * fixedShaftLength };
+    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return 0; 
     
-    const polyRod = [
-      { x: p1.x + perp.x * halfThick, y: p1.y + perp.y * halfThick },
-      { x: p1.x - perp.x * halfThick, y: p1.y - perp.y * halfThick },
-      { x: p2.x - perp.x * halfThick, y: p2.y - perp.y * halfThick },
-      { x: p2.x + perp.x * halfThick, y: p2.y + perp.y * halfThick },
-    ];
-
-    return polygonsIntersect(polyFlap, polyRod);
+    const a = (r1*r1 - r2*r2 + d*d) / (2*d);
+    const h = Math.sqrt(Math.max(0, r1*r1 - a*a));
+    const x2 = P.x + a * (N.x - P.x) / d;
+    const y2 = P.y + a * (N.y - P.y) / d;
+    
+    const x3_2 = x2 - h * (N.y - P.y) / d;
+    const y3_2 = y2 + h * (N.x - P.x) / d;
+    
+    const angle2 = Math.atan2(y3_2 - P.y, x3_2 - P.x) - staticGeo.flapMountBaseAngle;
+    return angle2 * 180 / Math.PI;
   };
 
-  // Find Max Angle via Iterative Search (Memoized)
-  const maxAngleDeg = useMemo(() => {
-    // We scan from 0 (Closed) to -160 (Open) to find the first collision
-    const { START_ANGLE, END_ANGLE, PRECISION } = CONSTRAINTS.COLLISION;
-    
-    // Immediate check for 0
-    if (checkCollision(START_ANGLE)) return START_ANGLE;
-
-    // Linear scan is efficient enough here (approx 300 iterations max) and robust
-    for (let a = START_ANGLE; a >= END_ANGLE; a -= PRECISION) {
-      if (checkCollision(a)) {
-        return a + PRECISION; // Back off one step to be safe
-      }
-    }
-    return END_ANGLE;
-  }, [flapHeight, motorSpacing, fixedShaftLength]); // Re-run if geometry changes
-
-  // =========================================================================
-  // 4. Final State Assembly
-  // =========================================================================
+  const currentAngleDeg = solveAngleFromNutY(currentNutY);
+  const finalState = solveKinematics(currentAngleDeg);
   
-  // Map 0-100% extension to 0-MaxAngle
-  const currentAngleDeg = (actuatorExtension / 100) * maxAngleDeg;
-  const currentKinematics = solveKinematics(currentAngleDeg);
-
-  // Determine Stopper Position (Visual only)
-  // The stopper is set at the point where max extension hits the max angle
-  const maxKinematics = solveKinematics(maxAngleDeg);
-  const distAtMax = getDistance(maxKinematics.shaftStartGlobal, maxKinematics.nutGlobal);
-  const stopperPos = distAtMax - (HARDWARE.NUT_WIDTH / 2);
+  // Calculate Shaft Drawing Length (from motor top to calculated top)
+  const motorBodyTopY = staticGeo.motorPos.y - MOTOR.HEIGHT/2;
+  const shaftLength = Math.max(0, motorBodyTopY - staticGeo.shaftTopY);
 
   return {
-    maxAngleDeg,
+    maxAngleDeg: staticGeo.maxAngleDeg,
     currentAngleDeg,
-    layout: {
-      canvasHeight: staticGeo.screenBottomY + DIMENSIONS.LAYOUT.BOTTOM_PADDING,
-      screenRightX: staticGeo.screenRightX,
-      screenTopY: DIMENSIONS.LAYOUT.TOP_MARGIN,
-      screenBottomY: staticGeo.screenBottomY,
-      insulationX: staticGeo.fixedX,
-    },
-    static: {
-      pivot: staticGeo.pivot,
-      motorPivot: staticGeo.motorPivot,
-      bracketTopY: staticGeo.pivot.y - MECHANICS.BRACKET_LENGTH + 5,
-      bracketBottomY: staticGeo.pivot.y + 10,
-      mountLength: staticGeo.mountLength,
-    },
+    layout: staticGeo,
+    static: staticGeo,
     dynamic: {
-      nut: currentKinematics.nutGlobal,
-      motorAngleDeg: currentKinematics.motorAngleRad * 180 / Math.PI,
-      shaftStart: currentKinematics.shaftStartGlobal,
-      shaftLength: fixedShaftLength,
-      stopperPos: stopperPos,
-      rodExtension: getDistance(currentKinematics.shaftStartGlobal, currentKinematics.nutGlobal)
+      nut: finalState.nut,
+      flapMount: finalState.flapMount,
+      rodTop: { x: staticGeo.motorPos.x, y: staticGeo.shaftTopY },
+      linkAngleDeg: finalState.linkAngleDeg,
+      shaftLength: shaftLength,
+      threadOffset: currentNutY % 4 
     }
   };
 };

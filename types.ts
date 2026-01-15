@@ -15,9 +15,9 @@ export interface Point {
 // User-Controlled Configuration
 export interface SimulationConfig {
   actuatorExtension: number; // 0 (Closed) to 100 (Open)
-  flapHeight:        number; // Length of the moving insulation panel
-  motorSpacing:      number; // Vertical distance between pivot and motor mount
+  gapHeight:         number; // The vertical height of the opening (controls flap size)
   animationSpeed:    number; // Hz (0 = paused)
+  motorSpacing:      number; // Horizontal distance between Pivot and Shaft
 }
 
 // Computed System State (The output of the physics engine)
@@ -34,24 +34,38 @@ export interface SystemState {
     screenTopY:       number;
     screenBottomY:    number;
     insulationX:      number; // The vertical line of the fixed insulation
+    fixedPanelRightX: number;
   };
 
   // Static Parts (Calculated once per layout)
   static: {
     pivot:            Point;  // Main hinge point
-    motorPivot:       Point;  // Bottom motor anchor
+    motorPos:         Point;  // Center of the fixed motor
     bracketTopY:      number;
     bracketBottomY:   number;
-    mountLength:      number; // Calculated length of flap bracket to clear obstacles
+    flapMountRadius:  number; // Distance from pivot to flap bracket hole
+    magnetY:          number; // Y position of the magnet
+    strikerY:         number; // Y position of the striker (relative to pivot when closed)
+    topPanelBottomY:  number; // Y position of the bottom of the top panel
+    topPanelTopY:     number; // Y position of the top of the top panel
+    limitCollarY:     number; // Y position of the collar on the shaft at max open
+    botPanelTopY:     number; // Y position of the top of the bottom panel
+    mountHoleLocal:   Point;  // Local coordinates of the mount hole relative to pivot
+    flapHeight:       number; // Derived from gapHeight
+    overlapTop:       number;
+    overlapBottom:    number;
+    barLength:        number;
+    shaftTopY:        number;
+    nutY_Closed:      number; // Added: Y position of the nut when closed (used for sorting labels)
   };
 
   // Dynamic Parts (Calculated every frame based on angle)
   dynamic: {
-    nut:              Point;  // The moving connection point on the flap
-    motorAngleDeg:    number; // Angle of the motor body
-    shaftStart:       Point;  // Where the rod exits the motor
-    shaftLength:      number; // Fixed length of the rod
-    stopperPos:       number; // Position of the limit stopper on the rod
-    rodExtension:     number; // How far the nut is along the rod
+    nut:              Point;  // The moving connection point on the vertical rod
+    flapMount:        Point;  // The point on the flap where the link attaches
+    rodTop:           Point;  // Visual top of the threaded rod
+    linkAngleDeg:     number; // Angle of the connecting link
+    shaftLength:      number; // Length of the threaded rod
+    threadOffset:     number; // Visual offset for the threads based on nut position
   };
 }
